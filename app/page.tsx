@@ -120,6 +120,7 @@ export default function Home() {
   const overlayRef = useRef<HTMLDivElement>(null);
   const artworkRef = useRef<HTMLImageElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const exportingRef = useRef(false);
 
   const selectedFormat = formats.find((format) => format.id === activeFormat) ?? formats[0];
   const selectedBorder = borderOptions.find((item) => item.id === border) ?? borderOptions[0];
@@ -222,15 +223,27 @@ export default function Home() {
     ctx.save(); ctx.filter = `saturate(${saturation}%)`;
     drawContained(ctx, image, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2); ctx.restore();
     if (overlayText.trim()) {
-      const previewWidth = artboardRef.current?.clientWidth || 420;
-      const exportFontSize = Math.max(26, textSize * (canvas.width / previewWidth));
-      const family = overlayRef.current ? getComputedStyle(overlayRef.current).fontFamily : "serif";
-      ctx.font = `${exportFontSize}px ${family}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = textColour;
+      const artboardBounds = artboardRef.current?.getBoundingClientRect();
+      const overlayBounds = overlayRef.current?.getBoundingClientRect();
+      const computedText = overlayRef.current ? getComputedStyle(overlayRef.current) : null;
+      const previewScale = artboardBounds ? canvas.width / artboardBounds.width : canvas.width / 420;
+      const previewFontSize = computedText ? Number.parseFloat(computedText.fontSize) : textSize;
+      const exportFontSize = previewFontSize * previewScale;
+      const family = computedText?.fontFamily ?? "serif";
+      const weight = computedText?.fontWeight ?? "400";
+      const style = computedText?.fontStyle ?? "normal";
+      const exportX = artboardBounds && overlayBounds
+        ? (overlayBounds.left + overlayBounds.width / 2 - artboardBounds.left) * previewScale
+        : canvas.width * (textX / 100);
+      const exportY = artboardBounds && overlayBounds
+        ? (overlayBounds.top + overlayBounds.height / 2 - artboardBounds.top) * previewScale
+        : canvas.height * (textY / 100);
+      ctx.font = `${style} ${weight} ${exportFontSize}px ${family}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = textColour;
       ctx.shadowColor = textColour === "#ffffff" ? "rgba(0,0,0,.48)" : "rgba(255,255,255,.85)";
       ctx.shadowBlur = Math.max(3, exportFontSize * .08); ctx.shadowOffsetY = Math.max(1, exportFontSize * .02);
       const lines = wrapLines(ctx, overlayText.trim(), canvas.width * .84);
-      const lineHeight = exportFontSize * 1.12; const startY = canvas.height * (textY / 100) - ((lines.length - 1) * lineHeight) / 2;
-      lines.forEach((line, index) => ctx.fillText(line, canvas.width * (textX / 100), startY + index * lineHeight));
+      const lineHeight = exportFontSize * 1.12; const startY = exportY - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, index) => ctx.fillText(line, exportX, startY + index * lineHeight));
     }
     return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image could not be created")), "image/jpeg", .95));
   }
@@ -255,7 +268,8 @@ export default function Home() {
   }
 
   async function saveAndShare() {
-    if (exporting) return;
+    if (exportingRef.current) return;
+    exportingRef.current = true;
     setExporting(true); setStatus("Creating the finished image…");
     try {
       const blob = await renderFinishedImage();
@@ -263,7 +277,8 @@ export default function Home() {
       try { await saveRecord(blob); } catch { historySaved = false; }
       const file = new File([blob], `${safeFilename(fileName)}-${activeFormat}.jpg`, { type: "image/jpeg" });
       const shareData = { files: [file], title: fileName };
-      if (navigator.share && navigator.canShare?.(shareData)) {
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
         try { await navigator.share(shareData); setStatus(historySaved ? "Finished image shared. Its posting record is ready below." : "Finished image shared. Posting history is temporarily unavailable."); }
         catch (error) { if (error instanceof DOMException && error.name === "AbortError") setStatus(historySaved ? "Sharing cancelled. The finished image remains in History." : "Sharing cancelled."); else throw error; }
       } else {
@@ -273,7 +288,7 @@ export default function Home() {
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "The image could not be saved");
-    } finally { setExporting(false); }
+    } finally { exportingRef.current = false; setExporting(false); }
   }
 
   async function togglePosted(platform: Platform) {
@@ -354,7 +369,7 @@ export default function Home() {
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.0.1</p>
+      <p className="version">Posting Art · v1.0.2</p>
     </main>
   );
 }
