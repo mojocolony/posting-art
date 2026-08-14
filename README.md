@@ -49,4 +49,4 @@ Posting history uses Cloudflare D1 for records and R2 for thumbnails. The logica
 
 ## Version
 
-1.0.2
+1.0.3
