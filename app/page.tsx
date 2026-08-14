@@ -3,6 +3,7 @@
 import {
   ChangeEvent,
   PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -109,6 +110,7 @@ export default function Home() {
   const [textY, setTextY] = useState(88);
   const [draggingText, setDraggingText] = useState(false);
   const [imageSrc, setImageSrc] = useState("/sample-watercolor.png");
+  const [imageRevision, setImageRevision] = useState(0);
   const [fileName, setFileName] = useState("Summer Garden");
   const [records, setRecords] = useState<PostingRecord[]>([]);
   const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export default function Home() {
   const [status, setStatus] = useState("Choose a photo, make your adjustments, then save or share it.");
   const [historyLoading, setHistoryLoading] = useState(true);
   const artboardRef = useRef<HTMLDivElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const artworkRef = useRef<HTMLImageElement>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -205,12 +208,16 @@ export default function Home() {
     setDraggingText(false);
   }
 
-  async function renderFinishedImage() {
+  const drawFinishedCanvas = useCallback(async (canvas: HTMLCanvasElement) => {
     const image = artworkRef.current;
     if (!image) throw new Error("No image selected");
-    if (!image.complete || !image.naturalWidth) await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Image could not be loaded")); });
+    if (!image.complete || !image.naturalWidth) {
+      await new Promise<void>((resolve, reject) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => reject(new Error("Image could not be loaded")), { once: true });
+      });
+    }
     await document.fonts.ready;
-    const canvas = document.createElement("canvas");
     canvas.width = selectedFormat.width; canvas.height = selectedFormat.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Image export is unavailable");
@@ -224,7 +231,6 @@ export default function Home() {
     drawContained(ctx, image, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2); ctx.restore();
     if (overlayText.trim()) {
       const artboardBounds = artboardRef.current?.getBoundingClientRect();
-      const overlayBounds = overlayRef.current?.getBoundingClientRect();
       const computedText = overlayRef.current ? getComputedStyle(overlayRef.current) : null;
       const previewScale = artboardBounds ? canvas.width / artboardBounds.width : canvas.width / 420;
       const previewFontSize = computedText ? Number.parseFloat(computedText.fontSize) : textSize;
@@ -232,12 +238,8 @@ export default function Home() {
       const family = computedText?.fontFamily ?? "serif";
       const weight = computedText?.fontWeight ?? "400";
       const style = computedText?.fontStyle ?? "normal";
-      const exportX = artboardBounds && overlayBounds
-        ? (overlayBounds.left + overlayBounds.width / 2 - artboardBounds.left) * previewScale
-        : canvas.width * (textX / 100);
-      const exportY = artboardBounds && overlayBounds
-        ? (overlayBounds.top + overlayBounds.height / 2 - artboardBounds.top) * previewScale
-        : canvas.height * (textY / 100);
+      const exportX = canvas.width * (textX / 100);
+      const exportY = canvas.height * (textY / 100);
       ctx.font = `${style} ${weight} ${exportFontSize}px ${family}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = textColour;
       ctx.shadowColor = textColour === "#ffffff" ? "rgba(0,0,0,.48)" : "rgba(255,255,255,.85)";
       ctx.shadowBlur = Math.max(3, exportFontSize * .08); ctx.shadowOffsetY = Math.max(1, exportFontSize * .02);
@@ -245,6 +247,27 @@ export default function Home() {
       const lineHeight = exportFontSize * 1.12; const startY = exportY - ((lines.length - 1) * lineHeight) / 2;
       lines.forEach((line, index) => ctx.fillText(line, exportX, startY + index * lineHeight));
     }
+  }, [border, borderSize, overlayText, saturation, selectedBorder.color, selectedFormat.height, selectedFormat.width, textColour, textSize, textX, textY]);
+
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    void drawFinishedCanvas(canvas).catch(() => setStatus("The preview could not be updated."));
+  }, [drawFinishedCanvas, imageRevision, imageSrc, textFont]);
+
+  useEffect(() => {
+    const artboard = artboardRef.current;
+    const canvas = previewCanvasRef.current;
+    if (!artboard || !canvas) return;
+    const observer = new ResizeObserver(() => { void drawFinishedCanvas(canvas); });
+    observer.observe(artboard);
+    return () => observer.disconnect();
+  }, [drawFinishedCanvas, imageRevision, imageSrc, textFont]);
+
+  async function renderFinishedImage() {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) throw new Error("Image export is unavailable");
+    await drawFinishedCanvas(canvas);
     return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image could not be created")), "image/jpeg", .95));
   }
 
@@ -357,10 +380,10 @@ export default function Home() {
           </aside>
 
           <section className="preview-area"><div className="preview-header"><div><p className="eyebrow">Preview</p><h2>{selectedFormat.label} · {selectedFormat.detail}</h2></div><span>Original artwork proportions</span></div>
-            <div className={`artboard-wrap ${activeFormat}`}><div ref={artboardRef} className={`artboard ${border === "blur" ? "blur-border" : ""}`} style={{ aspectRatio: selectedFormat.ratio, backgroundColor: selectedBorder.color, padding: `${borderSize}%` }}>
-              {border === "blur" && <img className="blurred-background" src={imageSrc} alt="" />}
-              <div className="artwork-frame"><img ref={artworkRef} className="artwork" src={imageSrc} alt="Selected artwork preview" style={{ filter: `saturate(${saturation}%)` }} /></div>
-              {overlayText && <div ref={overlayRef} className={`overlay-text ${textFont} ${draggingText ? "dragging" : ""}`} style={{ color: textColour, fontSize: `${textSize}px`, left: `${textX}%`, top: `${textY}%` }} onPointerDown={beginTextDrag} onPointerMove={continueTextDrag} onPointerUp={endTextDrag} onPointerCancel={endTextDrag} title="Drag to reposition text">{overlayText}</div>}
+            <div className={`artboard-wrap ${activeFormat}`}><div ref={artboardRef} className="artboard" style={{ aspectRatio: selectedFormat.ratio }}>
+              <canvas ref={previewCanvasRef} className="preview-canvas" aria-label="Selected artwork preview" />
+              <img ref={artworkRef} className="source-artwork" src={imageSrc} alt="" onLoad={() => setImageRevision((revision) => revision + 1)} />
+              {overlayText && <div ref={overlayRef} aria-hidden="true" className={`overlay-text text-drag-target ${textFont} ${draggingText ? "dragging" : ""}`} style={{ fontSize: `${textSize}px`, left: `${textX}%`, top: `${textY}%` }} onPointerDown={beginTextDrag} onPointerMove={continueTextDrag} onPointerUp={endTextDrag} onPointerCancel={endTextDrag} title="Drag to reposition text">{overlayText}</div>}
             </div></div>
             <div className="preview-footer"><div className="quality-note"><span className="quality-dot" /><span>{status}</span></div><button className="save-button" onClick={saveAndShare} disabled={exporting}><Icon name={exporting ? "spinner" : "download"} /> {exporting ? "Creating…" : "Save & share"}</button></div>
           </section>
@@ -369,7 +392,7 @@ export default function Home() {
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.0.2</p>
+      <p className="version">Posting Art · v1.0.3</p>
     </main>
   );
 }

@@ -105,14 +105,14 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
 .preview-area { grid-area: preview; min-width: 0; padding: 28px 40px 26px; display: grid; grid-template-rows: auto 1fr auto; background: var(--canvas); }
 .preview-header > span { color: var(--sage); font-size: 10px; padding: 7px 10px; border: 1px solid #d9dfd4; background: rgba(255,255,255,.55); border-radius: 16px; }
 .artboard-wrap { height: 510px; width: 100%; display: grid; place-items: center; padding: 22px; }
-.artboard { height: min(100%, 490px); max-width: 100%; position: relative; overflow: hidden; box-shadow: 0 15px 42px rgba(58,52,44,.18), 0 2px 7px rgba(58,52,44,.12); transition: aspect-ratio .25s ease, padding .2s ease, background-color .2s ease; }
-.artwork-frame { position: relative; z-index: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; }
-.artwork { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; box-shadow: 0 3px 12px rgba(50,42,35,.14); }
-.blurred-background { position: absolute; inset: -20px; width: calc(100% + 40px); height: calc(100% + 40px); object-fit: cover; filter: blur(20px) saturate(80%); opacity: .72; }
+.artboard { height: min(100%, 490px); max-width: 100%; position: relative; overflow: hidden; background: white; box-shadow: 0 15px 42px rgba(58,52,44,.18), 0 2px 7px rgba(58,52,44,.12); transition: aspect-ratio .25s ease; }
+.preview-canvas { display: block; width: 100%; height: 100%; }
+.source-artwork { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .overlay-text { position: absolute; z-index: 2; width: max-content; max-width: 84%; padding: 4px 7px; background: transparent; text-align: center; line-height: 1.12; overflow-wrap: anywhere; transform: translate(-50%, -50%); cursor: grab; touch-action: none; user-select: none; text-shadow: 0 1px 3px rgba(255,255,255,.92), 0 1px 4px rgba(0,0,0,.24); }
 .overlay-text.elegant { font-family: var(--font-display), serif; font-weight: 350; }
 .overlay-text.simple { font-family: var(--font-sans), sans-serif; font-weight: 400; letter-spacing: .01em; }
 .overlay-text.handwritten { font-family: var(--font-handwritten), cursive; font-weight: 400; }
+.text-drag-target { color: transparent; text-shadow: none; opacity: .001; }
 .overlay-text.dragging { cursor: grabbing; }
 .preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid #dfdcd4; padding-top: 18px; }
 .quality-note { display: flex; align-items: center; gap: 8px; max-width: 64%; color: var(--muted); font-size: 10px; line-height: 1.35; }
