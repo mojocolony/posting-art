@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAC8GGpbgJVTNjHp_c11q8_2XJ7nIwRqQk",
+  apiKey: "AIzaSyAC8GGpbgJVTNjHp_c11q8_2XJ7nIwRqOk",
   authDomain: "posting-art.firebaseapp.com",
   projectId: "posting-art",
   storageBucket: "posting-art.firebasestorage.app",
