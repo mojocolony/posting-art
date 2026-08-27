@@ -1,52 +1,37 @@
 # Posting Art
 
-Posting Art is a focused web app for preparing photographs of artwork for Facebook and Instagram without cropping the original art.
+Posting Art prepares photographs of artwork for Facebook and Instagram without cropping the original art. This edition is a static GitHub Pages app with private, synchronized posting history stored in Firebase Authentication and Cloud Firestore.
 
 ## Features
 
 - Portrait (4:5), square (1:1), and story (9:16) output formats
 - Original artwork proportions preserved in every format
 - Adjustable solid or blurred borders
-- Saturation control
-- Optional resizable text with font, colour, quick-position, slider, and drag controls
+- Saturation and text controls
 - Full-resolution JPG export
-- Native mobile sharing with a desktop download fallback
-- Posting history with Instagram and Facebook dates
+- Native mobile sharing and desktop download
+- Synchronized posting history for approved users
 - Responsive desktop, tablet, and mobile layouts
 
+## Firebase setup
+
+The app is connected to its dedicated **Posting Art** Firebase project. Email/password authentication, the two approved accounts, the Toronto Firestore database, and its restricted security rules were configured before this release was packaged.
+
+The included `firestore.rules` is a reusable template only. The published rules in Firebase are authoritative and contain the approved account addresses; keep those addresses out of a public GitHub repository.
+
+Thumbnails are compressed and stored directly in Firestore, so Cloud Storage and the Blaze billing plan are not required.
+
 ## Run locally
-
-Requirements:
-
-- Node.js 22.13 or newer
-- npm
-
-Install dependencies and start the development server:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Create and validate a production build:
+## Deploy on GitHub Pages
 
-```bash
-npm run build
-```
-
-## Storage
-
-Posting history uses Cloudflare D1 for records and R2 for thumbnails. The logical bindings are declared in `.openai/hosting.json` as `DB` and `BUCKET`. The app can still prepare and export images if posting history is temporarily unavailable.
-
-## Project structure
-
-- `app/page.tsx` contains the editing interface and image-export workflow.
-- `app/globals.css` contains the responsive design.
-- `app/api/history/` contains the history API routes.
-- `db/` and `drizzle/` contain the D1 schema and migration.
-- `public/` contains the app icon and sample artwork.
-- `.openai/hosting.json` contains the Sites deployment configuration.
+Upload the project to the `posting-art` repository. In GitHub, open **Settings → Pages** and set **Source** to **GitHub Actions**. Each update to the `main` branch will deploy automatically.
 
 ## Version
 
-1.0.3
+1.1.0

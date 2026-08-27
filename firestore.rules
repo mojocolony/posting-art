@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isPostingArtUser() {
+      return request.auth != null
+        && request.auth.token.email in [
+          "REPLACE_WITH_WILLIAM_EMAIL",
+          "REPLACE_WITH_PRIYA_EMAIL"
+        ];
+    }
+
+    match /postingRecords/{recordId} {
+      allow read, write: if isPostingArtUser();
+    }
+  }
+}
