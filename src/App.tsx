@@ -592,7 +592,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.2.2</p>
+      <p className="version">Posting Art · v1.2.3</p>
     </main>
   );
 }
