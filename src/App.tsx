@@ -415,11 +415,16 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
       const exportX = canvas.width * (textX / 100);
       const exportY = canvas.height * (textY / 100);
       ctx.font = `${style} ${weight} ${exportFontSize}px ${family}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = textColour;
-      ctx.shadowColor = textColour === "#ffffff" ? "rgba(0,0,0,.48)" : "rgba(255,255,255,.85)";
-      ctx.shadowBlur = Math.max(3, exportFontSize * .08); ctx.shadowOffsetY = Math.max(1, exportFontSize * .02);
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+      ctx.lineJoin = "round"; ctx.lineWidth = Math.max(1, exportFontSize * .008);
+      ctx.strokeStyle = relativeLuminance(textColour) > .48 ? "rgba(0,0,0,.26)" : "rgba(255,255,255,.34)";
       const lines = wrapLines(ctx, overlayText.trim(), canvas.width * .84);
       const lineHeight = exportFontSize * 1.12; const startY = exportY - ((lines.length - 1) * lineHeight) / 2;
-      lines.forEach((line, index) => ctx.fillText(line, exportX, startY + index * lineHeight));
+      lines.forEach((line, index) => {
+        const lineY = startY + index * lineHeight;
+        ctx.strokeText(line, exportX, lineY);
+        ctx.fillText(line, exportX, lineY);
+      });
     }
   }, [border, borderSize, overlayText, saturation, selectedBorder.color, selectedFormat.height, selectedFormat.width, textColour, textSize, textX, textY]);
 
@@ -587,7 +592,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.2.1</p>
+      <p className="version">Posting Art · v1.2.2</p>
     </main>
   );
 }
