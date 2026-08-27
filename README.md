@@ -9,7 +9,7 @@ Posting Art prepares photographs of artwork for Facebook and Instagram without c
 - TIFF import with local, non-destructive conversion
 - Four border colours generated from each uploaded artwork
 - Adjustable solid or blurred borders
-- Saturation and text controls
+- Saturation controls and painting-matched text colours that adapt to the selected border
 - Full-resolution JPG export
 - Native mobile sharing and desktop download
 - Synchronized posting history for approved users
@@ -36,4 +36,4 @@ Upload the project to the `posting-art` repository. In GitHub, open **Settings â
 
 ## Version
 
-1.2.0
+1.2.1
