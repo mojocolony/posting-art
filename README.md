@@ -13,7 +13,7 @@ Posting Art prepares photographs of artwork for Facebook and Instagram without c
 - Full-resolution JPG export
 - Native mobile sharing and desktop download
 - Synchronized posting history for approved users
-- Responsive desktop, tablet, and mobile layouts
+- Responsive desktop, tablet, and mobile layouts with a screen-filling, distortion-free preview
 
 ## Firebase setup
 
@@ -36,4 +36,4 @@ Upload the project to the `posting-art` repository. In GitHub, open **Settings â
 
 ## Version
 
-1.2.2
+1.2.3
