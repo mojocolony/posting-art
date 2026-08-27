@@ -90,8 +90,6 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
 .text-detail-row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px; }
 .text-colours, .position-options { display: flex; gap: 7px; margin-top: 7px; }
 .text-colours button { width: 25px; height: 25px; display: grid; place-items: center; padding: 0; border: 1px solid #d4d0c8; border-radius: 50%; color: white; cursor: pointer; }
-.text-colours button:first-child { color: white; }
-.text-colours button:nth-child(2) { color: #555; }
 .text-colours button.selected { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--coral); }
 .text-colours svg { width: 11px; }
 .position-options button { width: 30px; height: 25px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: white; cursor: pointer; }

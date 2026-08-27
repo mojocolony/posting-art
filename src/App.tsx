@@ -21,18 +21,15 @@ const defaultBorderPalette = {
   complement: "#ead8d5",
   accent: "#d9e0d6",
   dark: "#292a27",
+  deepComplement: "#5f4247",
+  deepAccent: "#405844",
+  imageLuminance: .72,
 };
-
-const textColours = [
-  { id: "charcoal", label: "Charcoal", value: "#292a27" },
-  { id: "white", label: "White", value: "#ffffff" },
-  { id: "coral", label: "Coral", value: "#a84f49" },
-  { id: "sage", label: "Sage", value: "#526851" },
-] as const;
 
 type FormatId = (typeof formats)[number]["id"];
 type BorderId = "white" | "warm" | "blush" | "sage" | "charcoal" | "blur";
 type TextFont = "elegant" | "simple" | "handwritten";
+type TextColourId = "match" | "contrast" | "complement" | "accent";
 type TextPosition = "top" | "centre" | "bottom" | "custom";
 type View = "prepare" | "history";
 type BorderPalette = typeof defaultBorderPalette;
@@ -73,6 +70,12 @@ function rgbToHsl(red: number, green: number, blue: number) {
   return { hue, saturation, lightness };
 }
 
+function relativeLuminance(hex: string) {
+  const channels = hex.match(/[a-f\d]{2}/gi)?.map((value) => Number.parseInt(value, 16) / 255) ?? [0, 0, 0];
+  const linear = channels.map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  return .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+}
+
 function createBorderPalette(image: HTMLImageElement): BorderPalette {
   const canvas = document.createElement("canvas");
   canvas.width = 64; canvas.height = 64;
@@ -81,8 +84,12 @@ function createBorderPalette(image: HTMLImageElement): BorderPalette {
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
   const bins = Array.from({ length: 18 }, () => ({ weight: 0, hueX: 0, hueY: 0, saturation: 0 }));
+  let luminanceTotal = 0;
+  let luminanceSamples = 0;
   for (let index = 0; index < pixels.length; index += 16) {
     if (pixels[index + 3] < 160) continue;
+    luminanceTotal += relativeLuminance(`#${[pixels[index], pixels[index + 1], pixels[index + 2]].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`);
+    luminanceSamples += 1;
     const colour = rgbToHsl(pixels[index], pixels[index + 1], pixels[index + 2]);
     if (colour.lightness > .9 && colour.saturation < .16) continue;
     if (colour.lightness < .07 || colour.saturation < .08) continue;
@@ -95,7 +102,8 @@ function createBorderPalette(image: HTMLImageElement): BorderPalette {
     bin.saturation += colour.saturation * weight;
   }
   const dominant = bins.reduce((best, candidate) => candidate.weight > best.weight ? candidate : best, bins[0]);
-  if (dominant.weight < 1) return defaultBorderPalette;
+  const imageLuminance = luminanceSamples ? luminanceTotal / luminanceSamples : defaultBorderPalette.imageLuminance;
+  if (dominant.weight < 1) return { ...defaultBorderPalette, imageLuminance };
   const hue = (Math.atan2(dominant.hueY, dominant.hueX) * 180 / Math.PI + 360) % 360;
   const saturation = dominant.saturation / dominant.weight * 100;
   return {
@@ -103,6 +111,9 @@ function createBorderPalette(image: HTMLImageElement): BorderPalette {
     complement: hslToHex(hue + 180, clamp(saturation * .48, 14, 34), 89),
     accent: hslToHex(hue + 28, clamp(saturation * .72, 20, 46), 82),
     dark: hslToHex(hue, clamp(saturation * .42, 12, 32), 22),
+    deepComplement: hslToHex(hue + 180, clamp(saturation * .82, 34, 62), 30),
+    deepAccent: hslToHex(hue + 28, clamp(saturation * .94, 38, 68), 31),
+    imageLuminance,
   };
 }
 
@@ -229,7 +240,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const [saturation, setSaturation] = useState(105);
   const [overlayText, setOverlayText] = useState("");
   const [textFont, setTextFont] = useState<TextFont>("elegant");
-  const [textColour, setTextColour] = useState("#292a27");
+  const [textColourId, setTextColourId] = useState<TextColourId>("match");
   const [textPosition, setTextPosition] = useState<TextPosition>("bottom");
   const [textSize, setTextSize] = useState(26);
   const [textX, setTextX] = useState(50);
@@ -262,6 +273,16 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     { id: "blur" as const, label: "Blur", color: borderPalette.light },
   ], [borderPalette]);
   const selectedBorder = borderOptions.find((item) => item.id === border) ?? borderOptions[0];
+  const selectedSurfaceIsDark = border === "blur"
+    ? borderPalette.imageLuminance < .42
+    : relativeLuminance(selectedBorder.color) < .32;
+  const textColours = useMemo(() => [
+    { id: "match" as const, label: selectedSurfaceIsDark ? "Light match" : "Dark match", value: selectedSurfaceIsDark ? borderPalette.light : borderPalette.dark },
+    { id: "contrast" as const, label: selectedSurfaceIsDark ? "White" : "Charcoal", value: selectedSurfaceIsDark ? "#ffffff" : "#292a27" },
+    { id: "complement" as const, label: "Complement", value: selectedSurfaceIsDark ? borderPalette.complement : borderPalette.deepComplement },
+    { id: "accent" as const, label: "Accent", value: selectedSurfaceIsDark ? borderPalette.accent : borderPalette.deepAccent },
+  ], [borderPalette, selectedSurfaceIsDark]);
+  const textColour = textColours.find((colour) => colour.id === textColourId)?.value ?? textColours[0].value;
   const postedCount = Number(Boolean(posted.instagram)) + Number(Boolean(posted.facebook));
   const today = useMemo(() => new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric" }).format(new Date()), []);
 
@@ -290,7 +311,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
       setFileName(file.name.replace(/\.[^.]+$/, ""));
       setOverlayText("");
       setTextFont("elegant");
-      setTextColour("#292a27");
+      setTextColourId("match");
       setTextPosition("bottom");
       setTextSize(26);
       setTextX(50);
@@ -307,7 +328,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
 
   function resetAdjustments() {
     setBorder("warm"); setBorderSize(8); setSaturation(105); setOverlayText("");
-    setTextFont("elegant"); setTextColour("#292a27"); setTextPosition("bottom");
+    setTextFont("elegant"); setTextColourId("match"); setTextPosition("bottom");
     setTextSize(26); setTextX(50); setTextY(96); setStatus("Adjustments reset.");
   }
 
@@ -547,7 +568,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
             <div className="control-group text-control"><label htmlFor="text-overlay">Text <span>Optional</span></label><input id="text-overlay" value={overlayText} onChange={(event) => setOverlayText(event.target.value)} placeholder="Add a title or short note" />
               <div className="text-section-label">Font</div><div className="text-options font-options" aria-label="Text font">{(["elegant", "simple", "handwritten"] as const).map((font) => <button key={font} onClick={() => setTextFont(font)} className={`${font} ${textFont === font ? "selected" : ""}`} aria-pressed={textFont === font}>{font[0].toUpperCase() + font.slice(1)}</button>)}</div>
               <div className="text-size-control"><div className="label-row"><label htmlFor="text-size">Size</label><span>{textSize}px</span></div><input id="text-size" type="range" min="14" max="44" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /><div className="range-labels"><span>Smaller</span><span>Larger</span></div></div>
-              <div className="text-detail-row"><div><div className="text-section-label">Colour</div><div className="text-colours" aria-label="Text colour">{textColours.map((colour) => <button key={colour.id} aria-label={`${colour.label} text`} title={colour.label} onClick={() => setTextColour(colour.value)} className={textColour === colour.value ? "selected" : ""} style={{ backgroundColor: colour.value }}>{textColour === colour.value && <Icon name="check" />}</button>)}</div></div>
+              <div className="text-detail-row"><div><div className="text-section-label">Colour</div><div className="text-colours" aria-label="Text colour">{textColours.map((colour) => <button key={colour.id} aria-label={`${colour.label} text`} title={colour.label} onClick={() => setTextColourId(colour.id)} className={textColourId === colour.id ? "selected" : ""} style={{ backgroundColor: colour.value, color: relativeLuminance(colour.value) > .48 ? "#343630" : "#ffffff" }}>{textColourId === colour.id && <Icon name="check" />}</button>)}</div></div>
                 <div><div className="text-section-label">Position</div><div className="position-options" aria-label="Text position">{(["top", "centre", "bottom"] as const).map((position) => <button key={position} onClick={() => chooseTextPosition(position)} className={textPosition === position ? "selected" : ""} aria-label={`${position} position`} aria-pressed={textPosition === position}><span className={`position-icon ${position}`} /></button>)}</div></div></div>
               <div className="fine-position"><div className="label-row"><label htmlFor="text-horizontal">Left / right</label><span>{Math.round(textX)}%</span></div><input id="text-horizontal" type="range" min="4" max="96" value={textX} onChange={(event) => chooseFineTextPosition(Number(event.target.value), textY)} /><div className="label-row vertical-label"><label htmlFor="text-vertical">Up / down</label><span>{Math.round(textY)}%</span></div><input id="text-vertical" type="range" min="4" max="96" value={textY} onChange={(event) => chooseFineTextPosition(textX, Number(event.target.value))} /><p className="drag-hint">Or drag the text directly on the preview</p></div>
             </div>
@@ -566,7 +587,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.2.0</p>
+      <p className="version">Posting Art · v1.2.1</p>
     </main>
   );
 }
