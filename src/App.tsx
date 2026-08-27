@@ -250,6 +250,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const artworkRef = useRef<HTMLImageElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const exportingRef = useRef(false);
+  const previewFrameRef = useRef<number | null>(null);
 
   const selectedFormat = formats.find((format) => format.id === activeFormat) ?? formats[0];
   const borderOptions = useMemo(() => [
@@ -366,16 +367,10 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     setTextX(safe.x); setTextY(safe.y);
   }, [activeFormat, borderSize, imageRevision, overlayText, textFont, textPosition, textSize]);
 
-  const drawFinishedCanvas = useCallback(async (canvas: HTMLCanvasElement) => {
+  const drawFinishedCanvas = useCallback((canvas: HTMLCanvasElement) => {
     const image = artworkRef.current;
     if (!image) throw new Error("No image selected");
-    if (!image.complete || !image.naturalWidth) {
-      await new Promise<void>((resolve, reject) => {
-        image.addEventListener("load", () => resolve(), { once: true });
-        image.addEventListener("error", () => reject(new Error("Image could not be loaded")), { once: true });
-      });
-    }
-    await document.fonts.ready;
+    if (!image.complete || !image.naturalWidth) throw new Error("Image is still loading");
     canvas.width = selectedFormat.width; canvas.height = selectedFormat.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Image export is unavailable");
@@ -407,26 +402,50 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     }
   }, [border, borderSize, overlayText, saturation, selectedBorder.color, selectedFormat.height, selectedFormat.width, textColour, textSize, textX, textY]);
 
+  const schedulePreviewRender = useCallback(() => {
+    if (previewFrameRef.current !== null) cancelAnimationFrame(previewFrameRef.current);
+    previewFrameRef.current = requestAnimationFrame(() => {
+      previewFrameRef.current = null;
+      const canvas = previewCanvasRef.current;
+      const image = artworkRef.current;
+      if (!canvas || !image?.complete || !image.naturalWidth) return;
+      try { drawFinishedCanvas(canvas); }
+      catch { setStatus("The preview could not be updated."); }
+    });
+  }, [drawFinishedCanvas]);
+
   useEffect(() => {
-    const canvas = previewCanvasRef.current;
-    if (!canvas) return;
-    void drawFinishedCanvas(canvas).catch(() => setStatus("The preview could not be updated."));
-  }, [drawFinishedCanvas, imageRevision, imageSrc, textFont]);
+    schedulePreviewRender();
+    void document.fonts.ready.then(schedulePreviewRender);
+    return () => {
+      if (previewFrameRef.current !== null) {
+        cancelAnimationFrame(previewFrameRef.current);
+        previewFrameRef.current = null;
+      }
+    };
+  }, [imageRevision, imageSrc, schedulePreviewRender, textFont]);
 
   useEffect(() => {
     const artboard = artboardRef.current;
-    const canvas = previewCanvasRef.current;
-    if (!artboard || !canvas) return;
-    const observer = new ResizeObserver(() => { void drawFinishedCanvas(canvas); });
+    if (!artboard) return;
+    const observer = new ResizeObserver(schedulePreviewRender);
     observer.observe(artboard);
     return () => observer.disconnect();
-  }, [drawFinishedCanvas, imageRevision, imageSrc, textFont]);
+  }, [schedulePreviewRender]);
 
   async function renderFinishedImage() {
-    const canvas = previewCanvasRef.current;
-    if (!canvas) throw new Error("Image export is unavailable");
-    await drawFinishedCanvas(canvas);
-    return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Image could not be created")), "image/jpeg", .95));
+    const image = artworkRef.current;
+    if (!image) throw new Error("No image selected");
+    if (!image.complete || !image.naturalWidth) {
+      await new Promise<void>((resolve, reject) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => reject(new Error("Image could not be loaded")), { once: true });
+      });
+    }
+    await document.fonts.ready;
+    const canvas = document.createElement("canvas");
+    drawFinishedCanvas(canvas);
+    return canvasToBlob(canvas, "image/jpeg", .95);
   }
 
   async function makeThumbnail(blob: Blob) {

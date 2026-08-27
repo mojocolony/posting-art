@@ -110,7 +110,10 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
 .preview-area { grid-area: preview; min-width: 0; padding: 28px 40px 26px; display: grid; grid-template-rows: auto 1fr auto; background: var(--canvas); }
 .preview-header > span { color: var(--sage); font-size: 10px; padding: 7px 10px; border: 1px solid #d9dfd4; background: rgba(255,255,255,.55); border-radius: 16px; }
 .artboard-wrap { height: 510px; width: 100%; display: grid; place-items: center; padding: 22px; }
-.artboard { height: min(100%, 490px); max-width: 100%; position: relative; overflow: hidden; background: white; box-shadow: 0 15px 42px rgba(58,52,44,.18), 0 2px 7px rgba(58,52,44,.12); transition: aspect-ratio .25s ease; }
+.artboard { height: auto; max-width: 100%; position: relative; overflow: hidden; background: white; box-shadow: 0 15px 42px rgba(58,52,44,.18), 0 2px 7px rgba(58,52,44,.12); }
+.artboard-wrap.portrait .artboard { width: min(100%, 373px); }
+.artboard-wrap.square .artboard { width: min(100%, 466px); }
+.artboard-wrap.story .artboard { width: min(100%, 262px); }
 .preview-canvas { display: block; width: 100%; height: 100%; }
 .source-artwork { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .overlay-text { position: absolute; z-index: 2; width: max-content; max-width: 84%; padding: 4px 7px; background: transparent; text-align: center; line-height: 1.12; overflow-wrap: anywhere; transform: translate(-50%, -50%); cursor: grab; touch-action: none; user-select: none; text-shadow: 0 1px 3px rgba(255,255,255,.92), 0 1px 4px rgba(0,0,0,.24); }
@@ -206,6 +209,9 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
   .preview-area { padding: 22px 15px; }
   .preview-header > span { display: none; }
   .artboard-wrap { height: 460px; padding-inline: 0; }
+  .artboard-wrap.portrait .artboard { width: min(100%, 333px); }
+  .artboard-wrap.square .artboard { width: min(100%, 416px); }
+  .artboard-wrap.story .artboard { width: min(100%, 234px); }
   .preview-footer { align-items: stretch; flex-direction: column; }
   .quality-note { max-width: none; }
   .save-button { width: 100%; }
