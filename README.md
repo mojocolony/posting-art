@@ -6,6 +6,8 @@ Posting Art prepares photographs of artwork for Facebook and Instagram without c
 
 - Portrait (4:5), square (1:1), and story (9:16) output formats
 - Original artwork proportions preserved in every format
+- TIFF import with local, non-destructive conversion
+- Four border colours generated from each uploaded artwork
 - Adjustable solid or blurred borders
 - Saturation and text controls
 - Full-resolution JPG export
@@ -34,4 +36,4 @@ Upload the project to the `posting-art` repository. In GitHub, open **Settings â
 
 ## Version
 
-1.1.0
+1.2.0

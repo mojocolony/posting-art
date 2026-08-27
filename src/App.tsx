@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import * as UTIF from "utif";
 import { PostingRecord, Platform, savePostingRecord, subscribeToPostingRecords, updatePostingStatus } from "./history";
 
 const formats = [
@@ -15,14 +16,12 @@ const formats = [
   { id: "story", label: "Story", detail: "9:16", ratio: "9 / 16", width: 1080, height: 1920 },
 ] as const;
 
-const borderOptions = [
-  { id: "white", label: "White", color: "#ffffff" },
-  { id: "warm", label: "Warm", color: "#f3eee4" },
-  { id: "blush", label: "Blush", color: "#ead8d5" },
-  { id: "sage", label: "Sage", color: "#d9e0d6" },
-  { id: "charcoal", label: "Dark", color: "#292a27" },
-  { id: "blur", label: "Blur", color: "#f3eee4" },
-] as const;
+const defaultBorderPalette = {
+  light: "#f3eee4",
+  complement: "#ead8d5",
+  accent: "#d9e0d6",
+  dark: "#292a27",
+};
 
 const textColours = [
   { id: "charcoal", label: "Charcoal", value: "#292a27" },
@@ -32,10 +31,144 @@ const textColours = [
 ] as const;
 
 type FormatId = (typeof formats)[number]["id"];
-type BorderId = (typeof borderOptions)[number]["id"];
+type BorderId = "white" | "warm" | "blush" | "sage" | "charcoal" | "blur";
 type TextFont = "elegant" | "simple" | "handwritten";
 type TextPosition = "top" | "centre" | "bottom" | "custom";
 type View = "prepare" | "history";
+type BorderPalette = typeof defaultBorderPalette;
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number) {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const segment = ((hue % 360) + 360) % 360 / 60;
+  const x = chroma * (1 - Math.abs((segment % 2) - 1));
+  const [red, green, blue] = segment < 1 ? [chroma, x, 0]
+    : segment < 2 ? [x, chroma, 0]
+      : segment < 3 ? [0, chroma, x]
+        : segment < 4 ? [0, x, chroma]
+          : segment < 5 ? [x, 0, chroma]
+            : [chroma, 0, x];
+  const match = l - chroma / 2;
+  return `#${[red, green, blue].map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function rgbToHsl(red: number, green: number, blue: number) {
+  const r = red / 255; const g = green / 255; const b = blue / 255;
+  const maximum = Math.max(r, g, b); const minimum = Math.min(r, g, b);
+  const delta = maximum - minimum;
+  let hue = 0;
+  if (delta) {
+    if (maximum === r) hue = 60 * (((g - b) / delta) % 6);
+    else if (maximum === g) hue = 60 * ((b - r) / delta + 2);
+    else hue = 60 * ((r - g) / delta + 4);
+  }
+  if (hue < 0) hue += 360;
+  const lightness = (maximum + minimum) / 2;
+  const saturation = delta ? delta / (1 - Math.abs(2 * lightness - 1)) : 0;
+  return { hue, saturation, lightness };
+}
+
+function createBorderPalette(image: HTMLImageElement): BorderPalette {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64; canvas.height = 64;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return defaultBorderPalette;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const bins = Array.from({ length: 18 }, () => ({ weight: 0, hueX: 0, hueY: 0, saturation: 0 }));
+  for (let index = 0; index < pixels.length; index += 16) {
+    if (pixels[index + 3] < 160) continue;
+    const colour = rgbToHsl(pixels[index], pixels[index + 1], pixels[index + 2]);
+    if (colour.lightness > .9 && colour.saturation < .16) continue;
+    if (colour.lightness < .07 || colour.saturation < .08) continue;
+    const bin = bins[Math.floor(colour.hue / 20) % bins.length];
+    const weight = (.2 + colour.saturation) * (.55 + (1 - Math.abs(colour.lightness - .5)));
+    const radians = colour.hue * Math.PI / 180;
+    bin.weight += weight;
+    bin.hueX += Math.cos(radians) * weight;
+    bin.hueY += Math.sin(radians) * weight;
+    bin.saturation += colour.saturation * weight;
+  }
+  const dominant = bins.reduce((best, candidate) => candidate.weight > best.weight ? candidate : best, bins[0]);
+  if (dominant.weight < 1) return defaultBorderPalette;
+  const hue = (Math.atan2(dominant.hueY, dominant.hueX) * 180 / Math.PI + 360) % 360;
+  const saturation = dominant.saturation / dominant.weight * 100;
+  return {
+    light: hslToHex(hue, clamp(saturation * .38, 12, 28), 92),
+    complement: hslToHex(hue + 180, clamp(saturation * .48, 14, 34), 89),
+    accent: hslToHex(hue + 28, clamp(saturation * .72, 20, 46), 82),
+    dark: hslToHex(hue, clamp(saturation * .42, 12, 32), 22),
+  };
+}
+
+function isTiffFile(file: File) {
+  return /\.tiff?$/i.test(file.name) || file.type === "image/tiff" || file.type === "image/x-tiff";
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob(
+    (blob) => blob ? resolve(blob) : reject(new Error("The image could not be prepared.")),
+    type,
+    quality,
+  ));
+}
+
+async function decodeTiff(file: File) {
+  const buffer = await file.arrayBuffer();
+  const directories = UTIF.decode(buffer);
+  if (!directories.length) throw new Error("This TIFF does not contain a readable image.");
+  const dimension = (directory: UTIF.IFD, tag: string, property: "width" | "height") => {
+    const tagged = directory[tag];
+    if (Array.isArray(tagged) && tagged.length) return Number(tagged[0]);
+    return Number(directory[property] || 0);
+  };
+  const directory = directories.reduce((largest, candidate) => {
+    const candidateArea = dimension(candidate, "t256", "width") * dimension(candidate, "t257", "height");
+    const largestArea = dimension(largest, "t256", "width") * dimension(largest, "t257", "height");
+    return candidateArea > largestArea ? candidate : largest;
+  });
+  const taggedWidth = dimension(directory, "t256", "width");
+  const taggedHeight = dimension(directory, "t257", "height");
+  const maximumPixels = window.matchMedia("(pointer: coarse)").matches ? 24_000_000 : 45_000_000;
+  if (taggedWidth * taggedHeight > maximumPixels) throw new Error("This TIFF is too large to open safely on this device. Export a JPEG copy and try again.");
+  UTIF.decodeImage(buffer, directory);
+  const { width, height } = directory;
+  if (!width || !height) throw new Error("This TIFF does not contain a readable image.");
+  const rgba = UTIF.toRGBA8(directory);
+  const source = document.createElement("canvas");
+  source.width = width; source.height = height;
+  const sourceContext = source.getContext("2d");
+  if (!sourceContext) throw new Error("TIFF conversion is unavailable in this browser.");
+  const pixelData = new Uint8ClampedArray(new ArrayBuffer(rgba.byteLength));
+  pixelData.set(rgba);
+  sourceContext.putImageData(new ImageData(pixelData, width, height), 0, 0);
+  const maximumDimension = 3200;
+  const scale = Math.min(1, maximumDimension / Math.max(width, height));
+  const output = document.createElement("canvas");
+  output.width = Math.max(1, Math.round(width * scale));
+  output.height = Math.max(1, Math.round(height * scale));
+  const outputContext = output.getContext("2d");
+  if (!outputContext) throw new Error("TIFF conversion is unavailable in this browser.");
+  outputContext.imageSmoothingEnabled = true;
+  outputContext.imageSmoothingQuality = "high";
+  outputContext.drawImage(source, 0, 0, output.width, output.height);
+  source.width = 1; source.height = 1;
+  return canvasToBlob(output, "image/jpeg", .96);
+}
+
+function validateImageUrl(url: string) {
+  return new Promise<void>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("That image format could not be opened. Try JPEG, PNG, WebP or TIFF."));
+    image.src = url;
+  });
+}
 
 function Icon({ name }: { name: "image" | "image-up" | "history" | "lock" | "download" | "check" | "spinner" }) {
   const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
@@ -91,6 +224,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const [view, setView] = useState<View>("prepare");
   const [activeFormat, setActiveFormat] = useState<FormatId>("portrait");
   const [border, setBorder] = useState<BorderId>("warm");
+  const [borderPalette, setBorderPalette] = useState<BorderPalette>(defaultBorderPalette);
   const [borderSize, setBorderSize] = useState(8);
   const [saturation, setSaturation] = useState(105);
   const [overlayText, setOverlayText] = useState("");
@@ -118,6 +252,14 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const exportingRef = useRef(false);
 
   const selectedFormat = formats.find((format) => format.id === activeFormat) ?? formats[0];
+  const borderOptions = useMemo(() => [
+    { id: "white" as const, label: "White", color: "#ffffff" },
+    { id: "warm" as const, label: "Light match", color: borderPalette.light },
+    { id: "blush" as const, label: "Soft complement", color: borderPalette.complement },
+    { id: "sage" as const, label: "Accent", color: borderPalette.accent },
+    { id: "charcoal" as const, label: "Dark match", color: borderPalette.dark },
+    { id: "blur" as const, label: "Blur", color: borderPalette.light },
+  ], [borderPalette]);
   const selectedBorder = borderOptions.find((item) => item.id === border) ?? borderOptions[0];
   const postedCount = Number(Boolean(posted.instagram)) + Number(Boolean(posted.facebook));
   const today = useMemo(() => new Intl.DateTimeFormat("en-CA", { month: "short", day: "numeric" }).format(new Date()), []);
@@ -130,26 +272,36 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     return () => { unsubscribe(); if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
   }, []);
 
-  function chooseImage(event: ChangeEvent<HTMLInputElement>) {
+  async function chooseImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = URL.createObjectURL(file);
-    setImageSrc(objectUrlRef.current);
-    setFileName(file.name.replace(/\.[^.]+$/, ""));
-    setOverlayText("");
-    setTextFont("elegant");
-    setTextColour("#292a27");
-    setTextPosition("bottom");
-    setTextSize(26);
-    setTextX(50);
-    setTextY(96);
-    setDraggingText(false);
-    setCurrentRecordId(null);
-    setPosted({ instagram: null, facebook: null });
-    setStatus("Photo ready. The artwork will stay uncropped in every format.");
-    setView("prepare");
     event.target.value = "";
+    const tiff = isTiffFile(file);
+    setStatus(tiff ? "Opening TIFF locally…" : "Opening photo…");
+    try {
+      const workingFile = tiff ? await decodeTiff(file) : file;
+      const nextUrl = URL.createObjectURL(workingFile);
+      try { await validateImageUrl(nextUrl); }
+      catch (error) { URL.revokeObjectURL(nextUrl); throw error; }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = nextUrl;
+      setImageSrc(nextUrl);
+      setFileName(file.name.replace(/\.[^.]+$/, ""));
+      setOverlayText("");
+      setTextFont("elegant");
+      setTextColour("#292a27");
+      setTextPosition("bottom");
+      setTextSize(26);
+      setTextX(50);
+      setTextY(96);
+      setDraggingText(false);
+      setCurrentRecordId(null);
+      setPosted({ instagram: null, facebook: null });
+      setStatus(tiff ? "TIFF ready. Its original file remains untouched." : "Photo ready. The artwork will stay uncropped in every format.");
+      setView("prepare");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "That image could not be opened.");
+    }
   }
 
   function resetAdjustments() {
@@ -333,7 +485,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   }
 
   function newPhotoButton() {
-    return <label className="new-photo button"><Icon name="image-up" /> New photo<input type="file" accept="image/*" onChange={chooseImage} /></label>;
+    return <label className="new-photo button"><Icon name="image-up" /> New photo<input type="file" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,image/jpeg,image/png,image/webp,image/tiff" onChange={chooseImage} /></label>;
   }
 
   return (
@@ -369,7 +521,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
               <div className="format-grid">{formats.map((format) => <button key={format.id} onClick={() => setActiveFormat(format.id)} className={activeFormat === format.id ? "selected" : ""}><span className={`format-icon ${format.id}`} /><strong>{format.label}</strong><small>{format.detail}</small></button>)}</div>
             </div>
             <div className="control-group"><div className="label-row"><label>Border</label><span>{borderSize}%</span></div>
-              <div className="swatches">{borderOptions.map((option) => <button key={option.id} title={option.label} aria-label={`${option.label} border`} onClick={() => setBorder(option.id)} className={`${border === option.id ? "selected" : ""} ${option.id === "blur" ? "blur-swatch" : ""}`} style={{ background: option.color }}>{border === option.id && <Icon name="check" />}</button>)}</div>
+              <div className="swatches">{borderOptions.map((option) => <button key={option.id} title={option.label} aria-label={`${option.label} border`} onClick={() => setBorder(option.id)} className={`${border === option.id ? "selected" : ""} ${option.id === "blur" ? "blur-swatch" : ""} ${option.id === "charcoal" ? "dark-swatch" : ""}`} style={{ background: option.color }}>{border === option.id && <Icon name="check" />}</button>)}</div>
               <input aria-label="Border size" type="range" min="0" max="18" value={borderSize} onChange={(event) => setBorderSize(Number(event.target.value))} />
             </div>
             <div className="control-group"><div className="label-row"><label htmlFor="saturation">Saturation</label><span>{saturation}%</span></div><input id="saturation" type="range" min="70" max="140" value={saturation} onChange={(event) => setSaturation(Number(event.target.value))} /><div className="range-labels"><span>Softer</span><span>Natural</span><span>Richer</span></div></div>
@@ -385,7 +537,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <section className="preview-area"><div className="preview-header"><div><p className="eyebrow">Preview</p><h2>{selectedFormat.label} · {selectedFormat.detail}</h2></div><span>Original artwork proportions</span></div>
             <div className={`artboard-wrap ${activeFormat}`}><div ref={artboardRef} className="artboard" style={{ aspectRatio: selectedFormat.ratio }}>
               <canvas ref={previewCanvasRef} className="preview-canvas" aria-label="Selected artwork preview" />
-              <img ref={artworkRef} className="source-artwork" src={imageSrc} alt="" onLoad={() => setImageRevision((revision) => revision + 1)} />
+              <img ref={artworkRef} className="source-artwork" src={imageSrc} alt="" onLoad={(event) => { setBorderPalette(createBorderPalette(event.currentTarget)); setImageRevision((revision) => revision + 1); }} />
               {overlayText && <div ref={overlayRef} aria-hidden="true" className={`overlay-text text-drag-target ${textFont} ${draggingText ? "dragging" : ""}`} style={{ fontSize: `${textSize}px`, left: `${textX}%`, top: `${textY}%` }} onPointerDown={beginTextDrag} onPointerMove={continueTextDrag} onPointerUp={endTextDrag} onPointerCancel={endTextDrag} title="Drag to reposition text">{overlayText}</div>}
             </div></div>
             <div className="preview-footer"><div className="quality-note"><span className="quality-dot" /><span>{status}</span></div><button className="save-button" onClick={saveAndShare} disabled={exporting}><Icon name={exporting ? "spinner" : "download"} /> {exporting ? "Creating…" : "Save & share"}</button></div>
@@ -395,7 +547,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.1.0</p>
+      <p className="version">Posting Art · v1.2.0</p>
     </main>
   );
 }

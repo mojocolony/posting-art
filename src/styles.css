@@ -66,7 +66,7 @@ button:focus-visible, input:focus-visible, .new-photo:focus-within { outline: 3p
 .swatches button { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 1px solid #d9d5cc; border-radius: 50%; cursor: pointer; color: #45463f; }
 .swatches button.selected { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--coral); }
 .swatches svg { width: 13px; }
-.swatches .charcoal { color: white; }
+.swatches .dark-swatch { color: white; }
 .blur-swatch { background: linear-gradient(135deg,#d88b83,#eee2b8 48%,#74896e) !important; position: relative; overflow: hidden; }
 .blur-swatch::after { content: ""; position: absolute; inset: 0; backdrop-filter: blur(3px); }
 .blur-swatch svg { position: relative; z-index: 1; }

@@ -1,7 +1,7 @@
 {
   "name": "posting-art",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,11 +11,13 @@
   "dependencies": {
     "firebase": "^12.2.1",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "utif": "^3.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/utif": "^3.0.6",
     "@vitejs/plugin-react": "^5.0.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.3"
