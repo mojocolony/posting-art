@@ -205,9 +205,34 @@ function getContainedRect(image: HTMLImageElement, x: number, y: number, width: 
   return { x: x + (width - drawWidth) / 2, y: y + (height - drawHeight) / 2, width: drawWidth, height: drawHeight };
 }
 
-function drawContained(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) {
+function drawContained(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number, saturation = 100) {
   const rect = getContainedRect(image, x, y, width, height);
-  ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+  if (saturation === 100) {
+    ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+    return;
+  }
+
+  // Safari does not consistently apply CanvasRenderingContext2D.filter. Process
+  // the contained artwork directly so preview and export behave identically.
+  const layer = document.createElement("canvas");
+  layer.width = Math.max(1, Math.round(rect.width));
+  layer.height = Math.max(1, Math.round(rect.height));
+  const layerContext = layer.getContext("2d", { willReadFrequently: true });
+  if (!layerContext) throw new Error("Image adjustment is unavailable");
+  layerContext.drawImage(image, 0, 0, layer.width, layer.height);
+  const pixels = layerContext.getImageData(0, 0, layer.width, layer.height);
+  const factor = saturation / 100;
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const red = pixels.data[index];
+    const green = pixels.data[index + 1];
+    const blue = pixels.data[index + 2];
+    const grey = .2126 * red + .7152 * green + .0722 * blue;
+    pixels.data[index] = clamp(Math.round(grey + (red - grey) * factor), 0, 255);
+    pixels.data[index + 1] = clamp(Math.round(grey + (green - grey) * factor), 0, 255);
+    pixels.data[index + 2] = clamp(Math.round(grey + (blue - grey) * factor), 0, 255);
+  }
+  layerContext.putImageData(pixels, 0, 0);
+  ctx.drawImage(layer, rect.x, rect.y, rect.width, rect.height);
 }
 
 function drawCovered(ctx: CanvasRenderingContext2D, image: HTMLImageElement, width: number, height: number) {
@@ -262,11 +287,9 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const artworkRef = useRef<HTMLImageElement>(null);
-  const controlsRef = useRef<HTMLElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const exportingRef = useRef(false);
   const previewFrameRef = useRef<number | null>(null);
-  const sheetDragRef = useRef<{ startY: number; distance: number } | null>(null);
 
   const selectedFormat = formats.find((format) => format.id === activeFormat) ?? formats[0];
   const borderOptions = useMemo(() => [
@@ -397,33 +420,6 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     setDraggingText(false);
   }
 
-  function beginSheetDrag(event: ReactPointerEvent<HTMLButtonElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    sheetDragRef.current = { startY: event.clientY, distance: 0 };
-  }
-
-  function continueSheetDrag(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!sheetDragRef.current) return;
-    const distance = Math.max(0, event.clientY - sheetDragRef.current.startY);
-    sheetDragRef.current.distance = distance;
-    controlsRef.current?.style.setProperty("--sheet-drag", `${distance}px`);
-  }
-
-  function endSheetDrag(event: ReactPointerEvent<HTMLButtonElement>) {
-    const drag = sheetDragRef.current;
-    if (!drag) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    const shouldClose = drag.distance < 8 || drag.distance > 72;
-    sheetDragRef.current = null;
-    if (shouldClose) setMobileControlsOpen(false);
-    requestAnimationFrame(() => controlsRef.current?.style.removeProperty("--sheet-drag"));
-  }
-
-  function cancelSheetDrag() {
-    sheetDragRef.current = null;
-    controlsRef.current?.style.removeProperty("--sheet-drag");
-  }
-
   useEffect(() => {
     if (textPosition === "custom") return;
     const safe = clampTextPosition(50, getPresetTextY(textPosition));
@@ -443,8 +439,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
       drawCovered(ctx, image, canvas.width, canvas.height); ctx.restore();
     }
     const inset = Math.round(Math.min(canvas.width, canvas.height) * (borderSize / 100));
-    ctx.save(); ctx.filter = `saturate(${saturation}%)`;
-    drawContained(ctx, image, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2); ctx.restore();
+    drawContained(ctx, image, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2, saturation);
     if (overlayText.trim()) {
       const artboardBounds = artboardRef.current?.getBoundingClientRect();
       const computedText = overlayRef.current ? getComputedStyle(overlayRef.current) : null;
@@ -602,8 +597,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
         </section>
       ) : (<>
         <section className="workspace">
-          <aside ref={controlsRef} className={`controls ${mobileControlsOpen ? "mobile-open" : ""}`} aria-label="Photo controls">
-            <button className="sheet-handle" aria-label="Close editing panel" onPointerDown={beginSheetDrag} onPointerMove={continueSheetDrag} onPointerUp={endSheetDrag} onPointerCancel={cancelSheetDrag}><span /></button>
+          <aside className={`controls ${mobileControlsOpen ? "mobile-open" : ""}`} aria-label="Photo controls">
             <div className="controls-heading"><div><p className="eyebrow">Editing</p><input className="artwork-title" aria-label="Artwork title" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div><div className="controls-heading-actions"><button className="reset" onClick={resetAdjustments}>Reset</button><button className="mobile-controls-close" aria-label="Close editing panel" onClick={() => setMobileControlsOpen(false)}><Icon name="x" /></button></div></div>
             <div className="control-group"><div className="label-row"><label>Social format</label><span className="locked"><Icon name="lock" /> Art stays uncropped</span></div>
               <div className="format-grid">{formats.map((format) => <button key={format.id} onClick={() => setActiveFormat(format.id)} className={activeFormat === format.id ? "selected" : ""}><span className={`format-icon ${format.id}`} /><strong>{format.label}</strong><small>{format.detail}</small></button>)}</div>
@@ -635,7 +629,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.3.2</p>
+      <p className="version">Posting Art · v1.3.3</p>
     </main>
   );
 }
