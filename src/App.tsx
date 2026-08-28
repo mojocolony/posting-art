@@ -181,7 +181,7 @@ function validateImageUrl(url: string) {
   });
 }
 
-function Icon({ name }: { name: "image" | "image-up" | "history" | "lock" | "download" | "check" | "spinner" }) {
+function Icon({ name }: { name: "image" | "image-up" | "history" | "lock" | "download" | "check" | "spinner" | "sliders" | "x" }) {
   const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
   if (name === "image") return <svg {...common}><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 2-2 5 4"/></svg>;
   if (name === "image-up") return <svg {...common}><path d="M10.3 21H5a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v9.3"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/><circle cx="9" cy="9" r="2"/><path d="m19 22v-6M22 19l-3-3-3 3"/></svg>;
@@ -189,6 +189,8 @@ function Icon({ name }: { name: "image" | "image-up" | "history" | "lock" | "dow
   if (name === "lock") return <svg {...common}><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>;
   if (name === "download") return <svg {...common}><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16"/></svg>;
   if (name === "spinner") return <svg {...common} className="spin"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>;
+  if (name === "sliders") return <svg {...common}><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>;
+  if (name === "x") return <svg {...common}><path d="m6 6 12 12M18 6 6 18"/></svg>;
   return <svg {...common}><path d="m5 12 4 4L19 6"/></svg>;
 }
 
@@ -255,6 +257,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState("Choose a photo, make your adjustments, then save or share it.");
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const artboardRef = useRef<HTMLDivElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -293,6 +296,16 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
     );
     return () => { unsubscribe(); if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("controls-panel-open", mobileControlsOpen);
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileControlsOpen(false); };
+    if (mobileControlsOpen) window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("controls-panel-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileControlsOpen]);
 
   async function chooseImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -530,7 +543,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
   }
 
   function newPhotoButton() {
-    return <label className="new-photo button"><Icon name="image-up" /> New photo<input type="file" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,image/jpeg,image/png,image/webp,image/tiff" onChange={chooseImage} /></label>;
+    return <label className="new-photo button"><Icon name="image-up" /><span>New photo</span><input type="file" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,image/jpeg,image/png,image/webp,image/tiff" onChange={chooseImage} /></label>;
   }
 
   return (
@@ -539,7 +552,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
         <div className="brand"><span className="brand-mark"><Icon name="image-up" /></span><div><h1>Posting Art</h1><p>Simple, polished social images</p></div></div>
         <nav className="view-tabs" aria-label="App views">
           <button className={view === "prepare" ? "active" : ""} onClick={() => setView("prepare")}><Icon name="image" /> Prepare</button>
-          <button className={view === "history" ? "active" : ""} onClick={() => setView("history")}><Icon name="history" /> History <span className="count">{records.length}</span></button>
+          <button className={view === "history" ? "active" : ""} onClick={() => { setMobileControlsOpen(false); setView("history"); }}><Icon name="history" /> History <span className="count">{records.length}</span></button>
         </nav>
         <div className="topbar-actions">{newPhotoButton()}<button className="sign-out" onClick={onSignOut} title={userEmail ? `Signed in as ${userEmail}` : "Sign out"}>Sign out</button></div>
       </header>
@@ -560,8 +573,9 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
         </section>
       ) : (<>
         <section className="workspace">
-          <aside className="controls" aria-label="Photo controls">
-            <div className="controls-heading"><div><p className="eyebrow">Editing</p><input className="artwork-title" aria-label="Artwork title" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div><button className="reset" onClick={resetAdjustments}>Reset</button></div>
+          {mobileControlsOpen && <button className="mobile-controls-backdrop" aria-label="Close editing panel" onClick={() => setMobileControlsOpen(false)} />}
+          <aside className={`controls ${mobileControlsOpen ? "mobile-open" : ""}`} aria-label="Photo controls" role={mobileControlsOpen ? "dialog" : undefined} aria-modal={mobileControlsOpen || undefined}>
+            <div className="controls-heading"><div><p className="eyebrow">Editing</p><input className="artwork-title" aria-label="Artwork title" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div><div className="controls-heading-actions"><button className="reset" onClick={resetAdjustments}>Reset</button><button className="mobile-controls-close" aria-label="Close editing panel" onClick={() => setMobileControlsOpen(false)}><Icon name="x" /></button></div></div>
             <div className="control-group"><div className="label-row"><label>Social format</label><span className="locked"><Icon name="lock" /> Art stays uncropped</span></div>
               <div className="format-grid">{formats.map((format) => <button key={format.id} onClick={() => setActiveFormat(format.id)} className={activeFormat === format.id ? "selected" : ""}><span className={`format-icon ${format.id}`} /><strong>{format.label}</strong><small>{format.detail}</small></button>)}</div>
             </div>
@@ -585,14 +599,14 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
               <img ref={artworkRef} className="source-artwork" src={imageSrc} alt="" onLoad={(event) => { setBorderPalette(createBorderPalette(event.currentTarget)); setImageRevision((revision) => revision + 1); }} />
               {overlayText && <div ref={overlayRef} aria-hidden="true" className={`overlay-text text-drag-target ${textFont} ${draggingText ? "dragging" : ""}`} style={{ fontSize: `${textSize}px`, left: `${textX}%`, top: `${textY}%` }} onPointerDown={beginTextDrag} onPointerMove={continueTextDrag} onPointerUp={endTextDrag} onPointerCancel={endTextDrag} title="Drag to reposition text">{overlayText}</div>}
             </div></div>
-            <div className="preview-footer"><div className="quality-note"><span className="quality-dot" /><span>{status}</span></div><button className="save-button" onClick={saveAndShare} disabled={exporting}><Icon name={exporting ? "spinner" : "download"} /> {exporting ? "Creating…" : "Save & share"}</button></div>
+            <div className="preview-footer"><div className="quality-note"><span className="quality-dot" /><span>{status}</span></div><div className="preview-actions"><button className="mobile-controls-trigger" onClick={() => setMobileControlsOpen(true)} aria-expanded={mobileControlsOpen}><Icon name="sliders" /> Edit</button><button className="save-button" onClick={saveAndShare} disabled={exporting}><Icon name={exporting ? "spinner" : "download"} /> {exporting ? "Creating…" : "Save & share"}</button></div></div>
           </section>
         </section>
         <section className="posting-card"><div className="posting-info"><div className="mini-thumb"><img src={imageSrc} alt="" /></div><div><p className="eyebrow">Posting record</p><h2>{fileName || "Untitled artwork"}</h2><span>{currentRecordId ? (postedCount ? `Posted to ${postedCount} ${postedCount === 1 ? "place" : "places"}` : "Saved · not posted yet") : "Created when you save or share"}</span></div></div>
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.2.3</p>
+      <p className="version">Posting Art · v1.3.0</p>
     </main>
   );
 }
