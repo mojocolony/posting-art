@@ -573,8 +573,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
         </section>
       ) : (<>
         <section className="workspace">
-          {mobileControlsOpen && <button className="mobile-controls-backdrop" aria-label="Close editing panel" onClick={() => setMobileControlsOpen(false)} />}
-          <aside className={`controls ${mobileControlsOpen ? "mobile-open" : ""}`} aria-label="Photo controls" role={mobileControlsOpen ? "dialog" : undefined} aria-modal={mobileControlsOpen || undefined}>
+          <aside className={`controls ${mobileControlsOpen ? "mobile-open" : ""}`} aria-label="Photo controls">
             <div className="controls-heading"><div><p className="eyebrow">Editing</p><input className="artwork-title" aria-label="Artwork title" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div><div className="controls-heading-actions"><button className="reset" onClick={resetAdjustments}>Reset</button><button className="mobile-controls-close" aria-label="Close editing panel" onClick={() => setMobileControlsOpen(false)}><Icon name="x" /></button></div></div>
             <div className="control-group"><div className="label-row"><label>Social format</label><span className="locked"><Icon name="lock" /> Art stays uncropped</span></div>
               <div className="format-grid">{formats.map((format) => <button key={format.id} onClick={() => setActiveFormat(format.id)} className={activeFormat === format.id ? "selected" : ""}><span className={`format-icon ${format.id}`} /><strong>{format.label}</strong><small>{format.detail}</small></button>)}</div>
@@ -606,7 +605,7 @@ export default function App({ userEmail, onSignOut }: { userEmail: string | null
           <div className="platforms">{(["instagram", "facebook"] as const).map((platform) => <button key={platform} className={posted[platform] ? "posted" : ""} onClick={() => togglePosted(platform)} aria-pressed={Boolean(posted[platform])}><span className={`platform-icon ${platform}`}>{platform === "instagram" ? "◎" : "f"}</span><span><strong>{platform[0].toUpperCase() + platform.slice(1)}</strong><small>{posted[platform] ? `Posted ${today}` : "Mark as posted"}</small></span><span className="status-check">{posted[platform] ? <Icon name="check" /> : ""}</span></button>)}</div>
         </section>
       </>)}
-      <p className="version">Posting Art · v1.3.0</p>
+      <p className="version">Posting Art · v1.3.1</p>
     </main>
   );
 }
