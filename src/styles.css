@@ -201,6 +201,7 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; heigh
   .controls-heading { position: sticky; z-index: 2; top: 0; margin: 0; padding: 6px 0 15px; background: #fffefa; border-bottom: 1px solid var(--line); }
   .controls-heading > div:first-child { flex: 1; min-width: 0; }
   .artwork-title { display: block; width: 100%; overflow: hidden; font-size: 19px; text-overflow: ellipsis; white-space: nowrap; }
+  .text-control > input { font-size: 16px; }
   .mobile-controls-close { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink); cursor: pointer; }
   .mobile-controls-close svg { width: 18px; }
   .mobile-controls-trigger { min-width: 108px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 16px; border: 1px solid #d8d4cc; border-radius: 12px; background: white; color: var(--ink); font-weight: 700; font-size: 12px; cursor: pointer; }
