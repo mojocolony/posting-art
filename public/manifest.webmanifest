@@ -1,25 +1,17 @@
 {
+  "id": "/posting-art/",
   "name": "Posting Art",
   "short_name": "Posting Art",
-  "description": "Prepare artwork photos for Instagram and Facebook without cropping the art.",
-  "id": "./",
-  "start_url": "./",
-  "scope": "./",
+  "description": "Prepare artwork photographs for social media without cropping or distortion.",
+  "start_url": "/posting-art/",
+  "scope": "/posting-art/",
   "display": "standalone",
-  "background_color": "#f7f4ee",
+  "background_color": "#fffdf9",
   "theme_color": "#f0ddd8",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

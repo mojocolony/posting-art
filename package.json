@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "node tests/install-icon.test.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "firebase": "^12.2.1",

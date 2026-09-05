@@ -14,7 +14,6 @@ Posting Art prepares photographs of artwork for Facebook and Instagram without c
 - Native mobile sharing and desktop download
 - Synchronized posting history for approved users
 - Split-screen mobile and iPad editing with a stable live preview, fixed bottom control panel, and iOS-safe text entry
-- Proper Chrome and iOS install icons using the Posting Art Image Up mark
 
 ## Firebase setup
 
@@ -38,3 +37,8 @@ Upload the project to the `posting-art` repository. In GitHub, open **Settings â
 ## Version
 
 1.3.5
+
+
+## PWA identity
+
+Posting Art uses manifest id/start_url/scope `/posting-art/`, keeping its Chrome-installed app identity separate from other mojocolony.github.io apps such as Photopedia.
