@@ -1,10 +1,10 @@
 {
-  "id": "/posting-art/",
+  "id": "./",
   "name": "Posting Art",
   "short_name": "Posting Art",
   "description": "Prepare artwork photographs for social media without cropping or distortion.",
-  "start_url": "/posting-art/",
-  "scope": "/posting-art/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#fffdf9",
   "theme_color": "#f0ddd8",
